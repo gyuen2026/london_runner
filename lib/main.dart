@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/setup_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,7 @@ class LondonRunnerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'London Runner',
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: AppTheme.dark(),
       home: const SetupScreen(),
     );
   }

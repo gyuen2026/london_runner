@@ -2,22 +2,30 @@ class RouteOption {
   RouteOption({
     required this.routeId,
     required this.name,
+    required this.badge,
+    required this.rank,
     required this.distanceKm,
     required this.estimatedDurationMin,
     required this.signalStops,
     required this.signalWaitTotalSec,
     required this.score,
+    required this.turns,
+    required this.greenWaveScore,
     required this.description,
     required this.polyline,
   });
 
   final String routeId;
   final String name;
+  final String badge;
+  final int rank;
   final double distanceKm;
   final double estimatedDurationMin;
   final int signalStops;
   final int signalWaitTotalSec;
   final double score;
+  final int turns;
+  final double greenWaveScore;
   final String description;
   final List<Map<String, double>> polyline;
 
@@ -26,11 +34,15 @@ class RouteOption {
     return RouteOption(
       routeId: json['route_id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'Route',
+      badge: json['badge']?.toString() ?? '',
+      rank: (json['rank'] as num?)?.toInt() ?? 0,
       distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0,
       estimatedDurationMin: (json['estimated_duration_min'] as num?)?.toDouble() ?? 0,
       signalStops: (json['signal_stops'] as num?)?.toInt() ?? 0,
       signalWaitTotalSec: (json['signal_wait_total_sec'] as num?)?.toInt() ?? 0,
       score: (json['score'] as num?)?.toDouble() ?? 0,
+      turns: (json['turns'] as num?)?.toInt() ?? 0,
+      greenWaveScore: (json['green_wave_score'] as num?)?.toDouble() ?? 0,
       description: json['description']?.toString() ?? '',
       polyline: rawPoly
           .map((p) => {

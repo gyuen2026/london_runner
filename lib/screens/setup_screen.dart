@@ -4,6 +4,7 @@ import '../models/place_location.dart';
 import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
 import '../services/london_runner_api.dart';
+import '../theme/app_theme.dart';
 import 'place_picker_screen.dart';
 import 'routes_screen.dart';
 
@@ -130,21 +131,59 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.2),
-          child: Icon(Icons.place, color: color),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        place?.shortLabel ?? 'Tap to choose',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+              ],
+            ),
+          ),
         ),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          place?.shortLabel ?? '탭해서 선택',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
       ),
     );
   }
@@ -152,31 +191,36 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('London Runner')),
+      appBar: AppBar(title: const Text('Run')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           const Text(
-            '출발 / 목적지 검색 → 지도에서 확인',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            'Plan your run',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.3,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _placeTile(
-            label: '출발지',
+            label: 'Start',
             place: _start,
-            color: Colors.green,
+            color: Colors.white,
             onTap: () => _pickPlace(isStart: true),
           ),
           OutlinedButton.icon(
             onPressed: _loading ? null : _useGpsAsStart,
-            icon: const Icon(Icons.my_location),
-            label: const Text('현재 위치 → 출발지'),
+            icon: const Icon(Icons.my_location, size: 18),
+            label: const Text('Use current location'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _placeTile(
-            label: '목적지',
+            label: 'End',
             place: _end,
-            color: Colors.red,
+            color: AppTheme.textSecondary,
             onTap: () => _pickPlace(isStart: false),
           ),
           const SizedBox(height: 12),
@@ -191,7 +235,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('경로 5개 받기'),
+                : const Text('Find routes'),
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
