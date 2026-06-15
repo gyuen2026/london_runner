@@ -37,4 +37,18 @@ class ApiConfig {
   }
 
   static Uri signalReport() => Uri.parse('$baseUrl/signals/report');
+
+  static Uri geocodeSearch({required String q, int limit = 6}) {
+    return Uri.parse('$baseUrl/geocode/search').replace(queryParameters: {
+      'q': q,
+      'limit': limit.toString(),
+    });
+  }
+
+  static Uri geocodeReverse({required double lat, required double lon}) {
+    return Uri.parse('$baseUrl/geocode/reverse').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lon': lon.toString(),
+    });
+  }
 }
