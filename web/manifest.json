@@ -1,11 +1,11 @@
 {
-    "name": "london_runner",
-    "short_name": "london_runner",
+    "name": "GEENGREEN",
+    "short_name": "GEENGREEN",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1A1A1A",
+    "theme_color": "#33FF66",
+    "description": "Hit green every light — signal-aware London commute",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
