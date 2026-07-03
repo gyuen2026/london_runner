@@ -1,38 +1,67 @@
 # London Runner (Flutter)
 
-Connects to Render API: `https://london-runner-api.onrender.com`
+Mobile and web client for **GEENGREEN London Runner** — route studio, live run navigation, QR handoff to phone, and experimental crossing-signal UI.
 
-## 1~5 setup (what goes where)
+| | |
+|---|---|
+| **Live web (deployed via backend)** | [https://london-runner-api.onrender.com/app/](https://london-runner-api.onrender.com/app/) |
+| **Backend + docs** | [gyuen2026/P1_2026](https://github.com/gyuen2026/P1_2026) |
+| **Handoff doc** | [PROJECT_HANDOFF.md](https://github.com/gyuen2026/P1_2026/blob/main/files/docs/PROJECT_HANDOFF.md) |
 
-| Step | What | Where |
-|------|------|--------|
-| 1 | Packages (`http`, `geolocator`, `health`, …) | `pubspec.yaml` |
-| 2 | API URL | `lib/config/api_config.dart` |
-| 3 | Routes recommend | `lib/screens/setup_screen.dart` → `routes_screen.dart` |
-| 4 | Live GPS + HR | `lib/screens/run_screen.dart` |
-| 5 | Signal report | GREEN/RED buttons in `run_screen.dart` |
+Default API base: `https://london-runner-api.onrender.com` (`lib/config/api_config.dart`).
 
-**Deploy:** Flutter app runs on **phone/simulator** (`flutter run`).  
-**Not** deployed to Render — only the Python API is on Render.
+## Project layout
 
-## Run
+```
+lib/
+  config/           API base URL
+  core/utils/       Signal countdown helpers
+  features/
+    maps/           Google Places search, route maps
+    navigate/       Run screen, crossing tracker, AR overlays
+    studio/         Route studio, mobile QR dialog
+scripts/
+  sync_web_to_backend.sh   Build web → copy to P1_2026/files/app/static/web/
+```
+
+## Run locally
 
 ```bash
-cd ~/Desktop/london_runner
 flutter pub get
-flutter run
+flutter run                    # iOS / Android / desktop
+flutter run -d chrome          # web dev
+```
+
+Optional API override:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
 ```
 
 ## Permissions
 
-- **iOS:** Location + HealthKit (Info.plist)
-- **Android:** Location + Activity recognition (AndroidManifest)
+- **iOS:** Location, HealthKit (`Info.plist`)
+- **Android:** Location, activity recognition (`AndroidManifest.xml`)
 
-## Git push (after changes)
+## Deploy web to Render
+
+Web is served from the **backend repo**, not this repo directly:
+
+```bash
+./scripts/sync_web_to_backend.sh /path/to/P12606/files
+# Then commit + push P1_2026; Render redeploys static assets
+```
+
+## Signal UI disclaimer
+
+Pedestrian phase in the app is **experimental** (bus-delay proxy, JamCam vehicle lane, or synthetic countdown). See backend handoff for honest limits before treating AR/voice alerts as ground truth.
+
+## Git
 
 ```bash
 git add .
-git commit -m "Flutter MVP: API routes, live coaching, signal report"
-git branch -M main
-git push -u origin main
+git commit -m "Describe your change"
+git push origin main
 ```
+
+Do not commit secrets; use `--dart-define` or local env for keys.

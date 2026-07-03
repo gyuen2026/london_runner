@@ -2,6 +2,20 @@
 class ApiConfig {
   static const String baseUrl = 'https://london-runner-api.onrender.com';
 
+  /// Client-side Google Maps / Places — pass via --dart-define=GOOGLE_MAPS_API_KEY=...
+  static const String googleMapsApiKey =
+      String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: '');
+
+  static bool get hasGoogleMaps => googleMapsApiKey.isNotEmpty;
+
+  /// Public Flutter web — anyone can scan QR (Render /app or custom host).
+  static const String webPublicUrl = String.fromEnvironment(
+    'WEB_PUBLIC_URL',
+    defaultValue: 'https://london-runner-api.onrender.com/app/',
+  );
+
+  static bool get hasPublicWebApp => webPublicUrl.isNotEmpty;
+
   static Uri root() => Uri.parse('$baseUrl/');
 
   static Uri routesRecommend({
@@ -50,14 +64,25 @@ class ApiConfig {
     int hr = 0,
     double pace = 0,
     double speedKmh = 0,
+    double? crossingLat,
+    double? crossingLon,
+    int? crossingIndex,
   }) {
-    return Uri.parse('$baseUrl/routes/check-status').replace(queryParameters: {
+    final params = <String, String>{
       'lat': lat.toString(),
       'lon': lon.toString(),
       'hr': hr.toString(),
       'pace': pace.toString(),
       'speed_kmh': speedKmh.toString(),
-    });
+    };
+    if (crossingLat != null && crossingLon != null) {
+      params['crossing_lat'] = crossingLat.toString();
+      params['crossing_lon'] = crossingLon.toString();
+    }
+    if (crossingIndex != null) {
+      params['crossing_index'] = crossingIndex.toString();
+    }
+    return Uri.parse('$baseUrl/routes/check-status').replace(queryParameters: params);
   }
 
   static Uri signalReport() => Uri.parse('$baseUrl/signals/report');
@@ -87,4 +112,6 @@ class ApiConfig {
       'lon': lon.toString(),
     });
   }
+
+  static Uri geocodeStatus() => Uri.parse('$baseUrl/geocode/status');
 }

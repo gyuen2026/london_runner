@@ -17,7 +17,7 @@ class AppTheme {
   static const textTertiary = Color(0xFF636366);
 
   /// Outdoor Run / Activity green
-  static const runGreen = Color(0xFF30D158);
+  static const runGreen = Color(0xFF39FF14);
   static const activityGreen = runGreen;
   static const signalGreen = runGreen;
   static const accentRun = runGreen;

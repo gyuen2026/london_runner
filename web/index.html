@@ -19,6 +19,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="GEENGREEN — hit green every light">
+  <meta name="geengreen-public-url" content="https://london-runner-api.onrender.com/app/">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,6 +32,20 @@
 
   <title>GEENGREEN</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Google Maps JS — required for google_maps_flutter on web.
+       Replace YOUR_GOOGLE_MAPS_API_KEY or pass ?gmaps_key= at runtime. -->
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var key = params.get('gmaps_key') || 'YOUR_GOOGLE_MAPS_API_KEY';
+      if (key && key !== 'YOUR_GOOGLE_MAPS_API_KEY') {
+        var s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key);
+        document.head.appendChild(s);
+      }
+    })();
+  </script>
+  <script src="lan_discovery.js"></script>
 </head>
 <body>
   <!--

@@ -1,3 +1,5 @@
+import 'package:london_runner/features/commute/models/crosswalk_point.dart';
+
 class RouteOption {
   RouteOption({
     required this.routeId,
@@ -14,6 +16,7 @@ class RouteOption {
     required this.greenWaveScore,
     required this.description,
     required this.polyline,
+    this.crossings = const [],
     this.suggestedPaceMinPerKm,
     this.departAtLabel,
     this.arriveByLabel,
@@ -34,6 +37,7 @@ class RouteOption {
   final double greenWaveScore;
   final String description;
   final List<Map<String, double>> polyline;
+  final List<CrosswalkPoint> crossings;
   final double? suggestedPaceMinPerKm;
   final String? departAtLabel;
   final String? arriveByLabel;
@@ -66,6 +70,9 @@ class RouteOption {
                 'lat': (p['lat'] as num).toDouble(),
                 'lon': (p['lon'] as num).toDouble(),
               })
+          .toList(),
+      crossings: (json['crossings'] as List<dynamic>? ?? [])
+          .map((e) => CrosswalkPoint.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }

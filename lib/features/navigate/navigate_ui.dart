@@ -116,10 +116,13 @@ class MapBottomSheet extends StatelessWidget {
     super.key,
     required this.child,
     this.showHandle = true,
+    this.expand = false,
   });
 
   final Widget child;
   final bool showHandle;
+  /// When true, fill available height (needed for scrollable result lists).
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +136,7 @@ class MapBottomSheet extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
           children: [
             if (showHandle) ...[
               const SizedBox(height: 10),
@@ -146,7 +149,7 @@ class MapBottomSheet extends StatelessWidget {
                 ),
               ),
             ],
-            child,
+            if (expand) Expanded(child: child) else child,
           ],
         ),
       ),
@@ -163,7 +166,7 @@ class PlaceSearchResultsSheet extends StatelessWidget {
     required this.suggestions,
     required this.selected,
     required this.pinColor,
-    required this.scrollController,
+    this.scrollController,
     required this.onSelect,
   });
 
@@ -171,23 +174,25 @@ class PlaceSearchResultsSheet extends StatelessWidget {
   final List<PlaceLocation> suggestions;
   final PlaceLocation? selected;
   final Color pinColor;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
   final ValueChanged<PlaceLocation> onSelect;
 
   @override
   Widget build(BuildContext context) {
     return MapBottomSheet(
+      expand: true,
       child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
             child: Row(
               children: [
-                Text(
-                  '${suggestions.length} results · tap to pick',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                Expanded(
+                  child: Text(
+                    '${suggestions.length} results · 1–10 on map · tap list to pick',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
                 ),
-                const Spacer(),
                 Text(title, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
               ],
             ),
@@ -203,6 +208,7 @@ class PlaceSearchResultsSheet extends StatelessWidget {
                 final isSelected = selected != null &&
                     (p.lat - selected!.lat).abs() < 0.00001 &&
                     (p.lon - selected!.lon).abs() < 0.00001;
+                final mapIndex = i < 10 ? i + 1 : null;
                 return Material(
                   color: isSelected ? pinColor.withValues(alpha: 0.08) : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
@@ -213,19 +219,37 @@ class PlaceSearchResultsSheet extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       child: Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceElevated,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.storefront_outlined,
-                              color: isSelected ? pinColor : AppTheme.textSecondary,
-                              size: 22,
-                            ),
-                          ),
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: mapIndex != null
+                                              ? (isSelected ? pinColor : Colors.white)
+                                              : AppTheme.surfaceElevated,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: mapIndex != null
+                                              ? Border.all(
+                                                  color: isSelected ? Colors.black : pinColor,
+                                                  width: 2,
+                                                )
+                                              : null,
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: mapIndex != null
+                                            ? Text(
+                                                '$mapIndex',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 16,
+                                                  color: isSelected ? Colors.black : pinColor,
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.storefront_outlined,
+                                                color: isSelected ? pinColor : AppTheme.textSecondary,
+                                                size: 22,
+                                              ),
+                                      ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(

@@ -2,15 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
 
 import 'package:london_runner/core/theme/app_theme.dart';
 import 'package:london_runner/core/utils/geo.dart';
 import 'package:london_runner/core/widgets/glass_panel.dart';
+import 'package:london_runner/features/maps/adaptive_map_controller.dart';
+import 'package:london_runner/features/maps/adaptive_map_view.dart';
+import 'package:london_runner/features/maps/map_overlay_barrier.dart';
 import 'package:london_runner/features/navigate/map_layers.dart';
 import 'package:london_runner/features/navigate/navigate_ui.dart';
 import 'package:london_runner/features/search/geocoding_service.dart';
 import 'package:london_runner/features/search/models/place_location.dart';
+
 class PlacePickerScreen extends StatefulWidget {
   const PlacePickerScreen({
     super.key,
@@ -37,7 +42,7 @@ class PlacePickerScreen extends StatefulWidget {
 class _PlacePickerScreenState extends State<PlacePickerScreen> {
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
-  final _mapController = MapController();
+  final _mapController = AdaptiveMapController();
   final _geocoding = GeocodingService();
 
   Timer? _debounce;
@@ -47,6 +52,7 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
   String? _error;
 
   static const _londonCenter = LatLng(51.5074, -0.1278);
+  static const _maxMapPins = 10;
 
   @override
   void initState() {
@@ -111,9 +117,9 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
         _suggestions = results;
         _searching = false;
       });
+      _unfocusSearch();
       if (results.isNotEmpty) {
-        final first = results.first;
-        _mapController.move(LatLng(first.lat, first.lon), 14);
+        _fitResultsOnMap(results);
       }
     } catch (e) {
       if (!mounted) return;
@@ -144,6 +150,27 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     return enriched;
   }
 
+  void _fitResultsOnMap(List<PlaceLocation> results) {
+    final pins = results.take(_maxMapPins).toList();
+    _mapController.fitBounds(
+      pins.map((p) => LatLng(p.lat, p.lon)).toList(),
+      padding: const EdgeInsets.fromLTRB(56, 120, 56, 240),
+    );
+  }
+
+  void _unfocusSearch() => FocusScope.of(context).unfocus();
+
+  void _onBack() {
+    if (_suggestions.isNotEmpty) {
+      setState(() {
+        _suggestions = [];
+        _error = null;
+      });
+      return;
+    }
+    Navigator.of(context).maybePop();
+  }
+
   void _selectPlace(PlaceLocation place, {bool confirm = false}) {
     if (widget.instantConfirm || confirm) {
       Navigator.of(context).pop(place);
@@ -151,12 +178,15 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
     }
     setState(() {
       _selected = place;
+      _suggestions = [];
       _searchCtrl.text = place.titleLine;
     });
+    _unfocusSearch();
     _mapController.move(LatLng(place.lat, place.lon), 17);
   }
 
   Future<void> _onMapTap(TapPosition tap, LatLng point) async {
+    _unfocusSearch();
     setState(() => _searching = true);
     try {
       final place = await _geocoding.reverse(point.latitude, point.longitude);
@@ -168,16 +198,23 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
         _searching = false;
       });
       _mapController.move(point, 17);
+      if (widget.instantConfirm) {
+        Navigator.of(context).pop(place);
+      }
     } catch (e) {
       if (!mounted) return;
+      final fallback = PlaceLocation(
+        lat: point.latitude,
+        lon: point.longitude,
+        label: '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}',
+      );
       setState(() {
-        _selected = PlaceLocation(
-          lat: point.latitude,
-          lon: point.longitude,
-          label: '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}',
-        );
+        _selected = fallback;
         _searching = false;
       });
+      if (widget.instantConfirm) {
+        Navigator.of(context).pop(fallback);
+      }
     }
   }
 
@@ -194,110 +231,165 @@ class _PlacePickerScreenState extends State<PlacePickerScreen> {
   Widget build(BuildContext context) {
     final selected = _selected;
     final showResults = _suggestions.isNotEmpty;
+    final mapPins = _suggestions.take(_maxMapPins).toList();
+    final topInset = MediaQuery.of(context).padding.top + 72;
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.38;
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: Stack(
         children: [
-            FlutterMap(
-              mapController: _mapController,
-              options: fastMapOptions(
-                initialCenter: _mapCenter,
-                initialZoom: selected != null ? 15 : 13,
-                onTap: _onMapTap,
-              ),
-            children: [
-              const DarkMapTileLayer(),
-              if (_suggestions.isNotEmpty)
-                MarkerLayer(
-                  markers: _suggestions.map((p) {
-                    final isSelected = selected != null &&
+          Positioned.fill(
+            child: AdaptiveMapView(
+              controller: _mapController,
+              initialCenter: _mapCenter,
+              initialZoom: selected != null ? 15 : 13,
+              onTap: _onMapTap,
+              flutterMarkers: [
+                for (var i = 0; i < mapPins.length; i++)
+                  _buildSearchMarker(
+                    index: i + 1,
+                    place: mapPins[i],
+                    selected: selected,
+                  ),
+                if (selected != null &&
+                    !mapPins.any((p) =>
                         (p.lat - selected.lat).abs() < 0.00001 &&
-                        (p.lon - selected.lon).abs() < 0.00001;
-                    return Marker(
-                      point: LatLng(p.lat, p.lon),
-                      width: isSelected ? 44 : 32,
-                      height: isSelected ? 44 : 32,
-                      child: GestureDetector(
-                        onTap: () => _selectPlace(p),
-                        child: Icon(
-                          Icons.location_on,
-                          size: isSelected ? 44 : 32,
-                          color: isSelected ? widget.pinColor : widget.pinColor.withValues(alpha: 0.55),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              if (selected != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(selected.lat, selected.lon),
-                      width: 52,
-                      height: 52,
-                      child: Icon(Icons.location_pin, size: 52, color: widget.pinColor),
-                    ),
-                  ],
-                ),
-            ],
+                        (p.lon - selected.lon).abs() < 0.00001))
+                  Marker(
+                    point: LatLng(selected.lat, selected.lon),
+                    width: 32,
+                    height: 32,
+                    child: Icon(Icons.location_on, color: widget.pinColor, size: 32),
+                  ),
+              ],
+              googleMarkers: _buildGoogleMarkers(mapPins, selected),
+            ),
           ),
 
-          MapSearchTopBar(
-            controller: _searchCtrl,
-            focusNode: _searchFocus,
-            searching: _searching,
-            hintText: 'Search London (3+ chars)',
-            onChanged: _onSearchChanged,
-            onSubmitted: _runSearch,
-            onClear: () {
-              _searchCtrl.clear();
-              setState(() => _suggestions = []);
-            },
+          mapOverlayBarrier(
+            Align(
+              alignment: Alignment.topCenter,
+              child: MapSearchTopBar(
+                controller: _searchCtrl,
+                focusNode: _searchFocus,
+                searching: _searching,
+                hintText: 'Search London (3+ chars)',
+                onChanged: _onSearchChanged,
+                onSubmitted: _runSearch,
+                onClear: () {
+                  _searchCtrl.clear();
+                  setState(() => _suggestions = []);
+                },
+                onBack: _onBack,
+              ),
+            ),
           ),
 
           if (showResults)
-            DraggableScrollableSheet(
-              initialChildSize: 0.38,
-              minChildSize: 0.22,
-              maxChildSize: 0.72,
-              snap: true,
-              builder: (context, scrollController) {
-                return PlaceSearchResultsSheet(
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: sheetHeight,
+              child: mapOverlayBarrier(
+                PlaceSearchResultsSheet(
                   title: widget.title,
                   suggestions: _suggestions,
                   selected: selected,
                   pinColor: widget.pinColor,
-                  scrollController: scrollController,
                   onSelect: _selectPlace,
-                );
-              },
+                ),
+              ),
             )
-          else if (selected != null)
-            PlaceConfirmSheet(
-              place: selected,
-              confirmLabel: 'Set as ${widget.title}',
-              onConfirm: _confirm,
+          else if (selected != null && !widget.instantConfirm)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: mapOverlayBarrier(
+                PlaceConfirmSheet(
+                  place: selected,
+                  confirmLabel: 'Set as ${widget.title}',
+                  onConfirm: _confirm,
+                ),
+              ),
             ),
 
           if (_error != null)
             Positioned(
               left: 16,
               right: 16,
-              bottom: showResults ? MediaQuery.of(context).size.height * 0.4 : 120,
-              child: GlassPanel(
-                padding: const EdgeInsets.all(12),
-                borderRadius: 0,
-                child: Text(_error!, style: const TextStyle(color: AppTheme.signalRed, fontSize: 13)),
+              bottom: showResults ? sheetHeight + 12 : 120,
+              child: mapOverlayBarrier(
+                GlassPanel(
+                  padding: const EdgeInsets.all(12),
+                  borderRadius: 0,
+                  child: Text(_error!, style: const TextStyle(color: AppTheme.signalRed, fontSize: 13)),
+                ),
               ),
             ),
 
           Positioned(
+            top: topInset,
             right: 12,
-            bottom: showResults ? MediaQuery.of(context).size.height * 0.42 : 100,
-            child: MapZoomControls(controller: _mapController),
+            child: mapOverlayBarrier(
+              AdaptiveMapZoomControls(controller: _mapController),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Set<gmaps.Marker> _buildGoogleMarkers(List<PlaceLocation> pins, PlaceLocation? selected) {
+    final markers = <gmaps.Marker>{};
+    for (var i = 0; i < pins.length; i++) {
+      final place = pins[i];
+      final isSelected = selected != null &&
+          (place.lat - selected.lat).abs() < 0.00001 &&
+          (place.lon - selected.lon).abs() < 0.00001;
+      markers.add(gmaps.Marker(
+        markerId: gmaps.MarkerId('pin_$i'),
+        position: toGoogleLatLng(LatLng(place.lat, place.lon)),
+        icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+          isSelected ? gmaps.BitmapDescriptor.hueGreen : gmaps.BitmapDescriptor.hueOrange,
+        ),
+        infoWindow: gmaps.InfoWindow(title: '${i + 1}', snippet: place.shortLabel),
+        onTap: () => _selectPlace(place),
+      ));
+    }
+    if (selected != null &&
+        !pins.any((p) =>
+            (p.lat - selected.lat).abs() < 0.00001 && (p.lon - selected.lon).abs() < 0.00001)) {
+      markers.add(gmaps.Marker(
+        markerId: const gmaps.MarkerId('selected'),
+        position: toGoogleLatLng(LatLng(selected.lat, selected.lon)),
+        icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(gmaps.BitmapDescriptor.hueGreen),
+        infoWindow: gmaps.InfoWindow(title: selected.shortLabel),
+      ));
+    }
+    return markers;
+  }
+
+  Marker _buildSearchMarker({
+    required int index,
+    required PlaceLocation place,
+    required PlaceLocation? selected,
+  }) {
+    final isSelected = selected != null &&
+        (place.lat - selected.lat).abs() < 0.00001 &&
+        (place.lon - selected.lon).abs() < 0.00001;
+    return Marker(
+      point: LatLng(place.lat, place.lon),
+      width: 36,
+      height: 48,
+      alignment: Alignment.topCenter,
+      child: GestureDetector(
+        onTap: () => _selectPlace(place),
+        child: searchResultMarker(
+          index: index,
+          selected: isSelected,
+          accent: widget.pinColor,
+        ),
       ),
     );
   }

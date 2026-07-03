@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>London Runner</string>
+	<string>GEENGREEN</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>london_runner</string>
+	<string>GEENGREEN</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -62,7 +62,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>London Runner needs your location for route coaching and signal checks.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>London Runner reads heart rate to adjust pacing advice.</string>
+	<string>London Runner reads heart rate and running pace from Apple Health to personalise coaching.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>London Runner does not write health data.</string>
 	<key>UIBackgroundModes</key>

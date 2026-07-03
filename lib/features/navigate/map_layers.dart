@@ -44,6 +44,32 @@ Widget navUserMarker() {
   );
 }
 
+/// Place search — full pan/zoom; unfocus search field when dragging map.
+MapOptions searchMapOptions({
+  LatLng? initialCenter,
+  double initialZoom = 14,
+  CameraFit? initialCameraFit,
+  void Function(TapPosition, LatLng)? onTap,
+}) {
+  return MapOptions(
+    initialCenter: initialCenter ?? const LatLng(51.5074, -0.1278),
+    initialZoom: initialZoom,
+    initialCameraFit: initialCameraFit,
+    onTap: onTap,
+    minZoom: 10,
+    maxZoom: 19,
+    interactionOptions: InteractionOptions(
+      flags: InteractiveFlag.drag |
+          InteractiveFlag.pinchZoom |
+          InteractiveFlag.scrollWheelZoom |
+          InteractiveFlag.doubleTapZoom,
+      scrollWheelVelocity: kIsWeb ? 0.022 : 0.015,
+      pinchZoomThreshold: 0.12,
+      enableMultiFingerGestureRace: true,
+    ),
+  );
+}
+
 /// Snappy pinch / scroll-wheel zoom — instant tile swap on web.
 MapOptions fastMapOptions({
   LatLng? initialCenter,
@@ -65,6 +91,24 @@ MapOptions fastMapOptions({
       enableMultiFingerGestureRace: true,
     ),
   );
+}
+
+class LightMapTileLayer extends StatelessWidget {
+  const LightMapTileLayer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return TileLayer(
+      urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+      subdomains: const ['a', 'b', 'c', 'd'],
+      userAgentPackageName: 'com.gyuen2026.geengreen',
+      retinaMode: false,
+      keepBuffer: 2,
+      panBuffer: 1,
+      maxNativeZoom: 19,
+      tileDisplay: const TileDisplay.instantaneous(),
+    );
+  }
 }
 
 class DarkMapTileLayer extends StatelessWidget {
@@ -124,12 +168,53 @@ class MapZoomControls extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _ZoomBtn(label: '+', onTap: () => _zoom(2)),
+        _ZoomBtn(label: '+', onTap: () => _zoom(1)),
         const SizedBox(height: 2),
-        _ZoomBtn(label: '−', onTap: () => _zoom(-2)),
+        _ZoomBtn(label: '−', onTap: () => _zoom(-1)),
       ],
     );
   }
+}
+
+/// Numbered pin for search results — readable on light map tiles.
+Widget searchResultMarker({
+  required int index,
+  required bool selected,
+  Color? accent,
+}) {
+  final color = accent ?? AppTheme.runGreen;
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: selected ? 30 : 26,
+        height: selected ? 30 : 26,
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? Colors.black : color, width: 2),
+          boxShadow: const [
+            BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$index',
+          style: TextStyle(
+            fontSize: selected ? 14 : 12,
+            fontWeight: FontWeight.w800,
+            color: selected ? Colors.black : color,
+            height: 1,
+          ),
+        ),
+      ),
+      Icon(
+        Icons.arrow_drop_down,
+        size: selected ? 22 : 18,
+        color: selected ? color : AppTheme.textSecondary,
+      ),
+    ],
+  );
 }
 
 class _ZoomBtn extends StatelessWidget {

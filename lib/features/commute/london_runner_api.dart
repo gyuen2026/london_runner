@@ -192,6 +192,9 @@ class LondonRunnerApi {
     int hr = 0,
     double pace = 0,
     double speedKmh = 0,
+    double? crossingLat,
+    double? crossingLon,
+    int? crossingIndex,
   }) async {
     final uri = ApiConfig.checkStatus(
       lat: lat,
@@ -199,6 +202,9 @@ class LondonRunnerApi {
       hr: hr,
       pace: pace,
       speedKmh: speedKmh,
+      crossingLat: crossingLat,
+      crossingLon: crossingLon,
+      crossingIndex: crossingIndex,
     );
     final res = await _client.get(uri).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {

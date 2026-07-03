@@ -2,17 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:london_runner/features/maps/adaptive_map_controller.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'package:london_runner/core/services/ui_sound.dart';
 import 'package:london_runner/core/theme/app_theme.dart';
-import 'package:london_runner/core/widgets/glass_panel.dart';
 import 'package:london_runner/features/commute/commute_places_store.dart';
 import 'package:london_runner/features/commute/london_runner_api.dart';
-import 'package:london_runner/features/commute/widgets/speed_ui.dart';
-import 'package:london_runner/features/commute/widgets/watch_ui.dart';
+import 'package:london_runner/features/commute/routes_screen.dart';
 import 'package:london_runner/features/search/models/place_location.dart';
 import 'package:london_runner/features/search/place_picker_screen.dart';
-import 'routes_screen.dart';
+import 'package:london_runner/features/studio/studio_ui.dart';
+
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
 
@@ -36,6 +37,7 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   final _api = LondonRunnerApi();
   final _commuteStore = CommutePlacesStore();
+  final _mapController = AdaptiveMapController();
 
   PlaceLocation? _home;
   PlaceLocation? _office;
@@ -43,7 +45,6 @@ class _SetupScreenState extends State<SetupScreen> {
   PlaceLocation? _end;
 
   TimeOfDay _arriveBy = const TimeOfDay(hour: 9, minute: 0);
-  bool _toWork = true;
   bool _loading = false;
   String? _error;
 
@@ -57,13 +58,13 @@ class _SetupScreenState extends State<SetupScreen> {
   void initState() {
     super.initState();
     _bootstrap();
-    // Best-effort pre-warm; don't block UI.
     _api.warmup(timeout: const Duration(seconds: 20));
   }
 
   @override
   void dispose() {
     _scanTicker?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -76,18 +77,23 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() {
       _home = home;
       _office = office;
-      _applyCommuteDirection();
+      _start = home;
+      _end = office;
     });
+    _fitMap();
   }
 
-  void _applyCommuteDirection() {
-    if (_toWork) {
-      _start = _home;
-      _end = _office;
-    } else {
-      _start = _office;
-      _end = _home;
-    }
+  void _fitMap() {
+    final s = _start;
+    final e = _end;
+    if (s == null || e == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mapController.fitCoordinates(
+        [LatLng(s.lat, s.lon), LatLng(e.lat, e.lon)],
+        padding: const EdgeInsets.all(48),
+      );
+    });
   }
 
   void _startScanProgress() {
@@ -103,9 +109,7 @@ class _SetupScreenState extends State<SetupScreen> {
       }
       setState(() {
         _scanElapsed++;
-        if (_scanStage < WatchScanOverlay.stages.length - 1 && _scanElapsed % 3 == 0) {
-          _scanStage++;
-        }
+        if (_scanStage < 3 && _scanElapsed % 3 == 0) _scanStage++;
         _scanProgress = (_scanProgress + 0.06).clamp(0.08, 0.92);
       });
     });
@@ -116,43 +120,49 @@ class _SetupScreenState extends State<SetupScreen> {
     _scanTicker = null;
   }
 
-  Future<void> _pickCommutePlace({required bool isHome}) async {
+  Future<void> _pickPlace({required bool isFrom}) async {
+    final initial = isFrom ? _start : _end;
     final result = await Navigator.of(context).push<PlaceLocation>(
       MaterialPageRoute(
         builder: (_) => PlacePickerScreen(
-          title: isHome ? 'Home' : 'Office',
-          initial: isHome ? _home : _office,
+          title: isFrom ? 'Origin' : 'Destination',
+          initial: initial,
           biasLat: _start?.lat,
           biasLon: _start?.lon,
-          pinColor: AppTheme.activityGreen,
+          pinColor: isFrom ? StudioTheme.neon : AppTheme.signalRed,
           instantConfirm: true,
         ),
       ),
     );
     if (result == null) return;
-    if (isHome) {
-      await _commuteStore.saveHome(result);
-      setState(() => _home = result);
-    } else {
-      await _commuteStore.saveOffice(result);
-      setState(() => _office = result);
-    }
-    _applyCommuteDirection();
+    setState(() {
+      if (isFrom) {
+        _start = result;
+      } else {
+        _end = result;
+      }
+    });
+    _fitMap();
   }
 
-  Future<void> _pickArriveTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _arriveBy);
-    if (picked != null) {
-      UiSound.instance.tap();
-      setState(() => _arriveBy = picked);
-    }
+  void _loadDemo() {
+    UiSound.instance.tap();
+    setState(() {
+      _start = SetupScreen.demoHome;
+      _end = SetupScreen.demoOffice;
+      _home = SetupScreen.demoHome;
+      _office = SetupScreen.demoOffice;
+    });
+    _commuteStore.saveHome(SetupScreen.demoHome);
+    _commuteStore.saveOffice(SetupScreen.demoOffice);
+    _fitMap();
   }
 
   Future<void> _findGreenCommute() async {
     final start = _start;
     final end = _end;
     if (start == null || end == null) {
-      setState(() => _error = 'Set home and office first');
+      setState(() => _error = '출발지와 도착지를 선택해 주세요');
       return;
     }
 
@@ -164,7 +174,6 @@ class _SetupScreenState extends State<SetupScreen> {
     _startScanProgress();
 
     try {
-      // Resilient fetch: auto-retry once after warmup on cold-start timeout.
       final routes = await _api.fetchGreenCommute(
         startLat: start.lat,
         startLon: start.lon,
@@ -172,7 +181,7 @@ class _SetupScreenState extends State<SetupScreen> {
         endLon: end.lon,
         arriveHour: _arriveBy.hour,
         arriveMinute: _arriveBy.minute,
-        commuteType: _toWork ? 'work' : 'home',
+        commuteType: 'work',
         fast: true,
       );
       if (!mounted || _scanCancelled) return;
@@ -182,18 +191,16 @@ class _SetupScreenState extends State<SetupScreen> {
         return;
       }
 
-      final arriveLabel = MaterialLocalizations.of(context).formatTimeOfDay(_arriveBy);
-      setState(() => _scanProgress = 1.0);
       await UiSound.instance.success();
       if (!mounted || _scanCancelled) return;
-      final bestPace = routes.first.suggestedPaceMinPerKm ?? 5.5;
+      final bestPace = routes.first.suggestedPaceMinPerKm ?? 5.25;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => RoutesScreen(
             routes: routes,
             paceMinPerKm: bestPace,
-            title: 'Routes',
-            subtitle: 'Arrive by $arriveLabel',
+            from: start,
+            to: end,
           ),
         ),
       );
@@ -213,6 +220,13 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() => _loading = false);
   }
 
+  List<LatLng> get _mapPoints {
+    final s = _start;
+    final e = _end;
+    if (s == null || e == null) return [];
+    return [LatLng(s.lat, s.lon), LatLng(e.lat, e.lon)];
+  }
+
   @override
   Widget build(BuildContext context) {
     final start = _start;
@@ -220,170 +234,99 @@ class _SetupScreenState extends State<SetupScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Row(
-                    children: [
-                      const Expanded(child: GeenGreenLogo()),
-                      WatchCornerButton(
-                        icon: Icons.home_outlined,
-                        label: 'Home',
-                        onTap: () => _pickCommutePlace(isHome: true),
-                      ),
-                      const SizedBox(width: 8),
-                      WatchCornerButton(
-                        icon: Icons.work_outline,
-                        label: 'Office',
-                        onTap: () => _pickCommutePlace(isHome: false),
-                      ),
-                    ],
-                  ),
+                StudioHeader(
+                  onQr: () => showStudioQrDialog(context),
+                  onHud: () {},
                 ),
-                const SizedBox(height: 20),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     children: [
-                      Text(
-                        'Outdoor Run',
-                        style: Theme.of(context).textTheme.headlineLarge,
+                      StudioRouteInputCard(
+                        fromLabel: start?.titleLine ?? '',
+                        toLabel: end?.titleLine ?? '',
+                        onFromTap: () => _pickPlace(isFrom: true),
+                        onToTap: () => _pickPlace(isFrom: false),
+                        onSparkle: _loading ? null : _findGreenCommute,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Green wave route · arrive on time',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      const SizedBox(height: 12),
+                      StudioPreviewMap(
+                        controller: _mapController,
+                        points: _mapPoints,
+                        center: start != null ? LatLng(start.lat, start.lon) : null,
                       ),
-                      const SizedBox(height: 24),
-                      GlassPanel(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _DirectionPill(
-                                label: 'To Work',
-                                active: _toWork,
-                                onTap: () {
-                                  if (_toWork) return;
-                                  UiSound.instance.tap();
-                                  setState(() {
-                                    _toWork = true;
-                                    _applyCommuteDirection();
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _DirectionPill(
-                                label: 'To Home',
-                                active: !_toWork,
-                                onTap: () {
-                                  if (!_toWork) return;
-                                  UiSound.instance.tap();
-                                  setState(() {
-                                    _toWork = false;
-                                    _applyCommuteDirection();
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: _loadDemo,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: StudioTheme.neon,
+                          side: const BorderSide(color: StudioTheme.neon),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text(
+                          'Load Home → Office Demo',
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      SpeedRouteCard(
-                        toWork: _toWork,
-                        fromLabel: start?.titleLine ?? 'Set start',
-                        fromSub: start?.addressLine ?? '',
-                        toLabel: end?.titleLine ?? 'Set end',
-                        toSub: end?.addressLine ?? '',
-                        onFromTap: () => _pickCommutePlace(isHome: _toWork),
-                        onToTap: () => _pickCommutePlace(isHome: !_toWork),
-                      ),
-                      const SizedBox(height: 20),
-                      Text('Arrive by', style: Theme.of(context).textTheme.labelSmall),
-                      const SizedBox(height: 10),
-                      SpeedTimeChips(
-                        selected: _arriveBy,
-                        onSelected: (t) => setState(() => _arriveBy = t),
-                        onCustom: _pickArriveTime,
-                      ),
-                      if (kIsWeb) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          'Web demo · SE16 → Victoria',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
-                        ),
-                      ],
                       if (_error != null) ...[
-                        const SizedBox(height: 14),
-                        Text(_error!, style: const TextStyle(color: AppTheme.signalRed, fontSize: 14)),
+                        const SizedBox(height: 12),
+                        Text(_error!, style: const TextStyle(color: AppTheme.signalRed, fontSize: 13)),
                       ],
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: SpeedGoButton(
-                    label: 'Start Run',
-                    loading: _loading,
-                    loadingLabel: 'Planning route…',
-                    onPressed: _findGreenCommute,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: StudioGoButton(loading: _loading, onPressed: _findGreenCommute),
                 ),
               ],
             ),
-          ),
-          if (_loading)
-            WatchScanOverlay(
-              stage: WatchScanOverlay.stages[_scanStage.clamp(0, WatchScanOverlay.stages.length - 1)],
-              progress: _scanProgress,
-              elapsedSec: _scanElapsed,
-              onCancel: _cancelScan,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DirectionPill extends StatelessWidget {
-  const _DirectionPill({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: active ? AppTheme.runGreen : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                color: active ? Colors.black : AppTheme.textSecondary,
+            if (_loading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.72),
+                child: Center(
+                  child: StudioCard(
+                    child: SizedBox(
+                      width: 280,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 72,
+                            height: 72,
+                            child: CircularProgressIndicator(
+                              value: _scanProgress.clamp(0.04, 0.98),
+                              strokeWidth: 5,
+                              color: StudioTheme.neon,
+                              backgroundColor: AppTheme.surfaceElevated,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            const ['Connecting', 'Mapping route', 'Syncing signals', 'Optimizing green wave'][
+                                _scanStage.clamp(0, 3)],
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _scanElapsed > 12 ? 'Waking server — first load ~30s' : 'Computing pathways…',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                          ),
+                          TextButton(onPressed: _cancelScan, child: const Text('Cancel')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
+          ],
         ),
       ),
     );

@@ -3,11 +3,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'package:london_runner/config/api_config.dart';
+import 'package:london_runner/features/maps/google_places_service.dart';
 import 'package:london_runner/features/search/models/place_location.dart';
+
 class GeocodingService {
-  GeocodingService({http.Client? client}) : _client = client ?? http.Client();
+  GeocodingService({http.Client? client, GooglePlacesService? google})
+      : _client = client ?? http.Client(),
+        _google = google ?? GooglePlacesService();
 
   final http.Client _client;
+  final GooglePlacesService _google;
   final _cache = <String, _CacheEntry>{};
   static const _cacheTtl = Duration(minutes: 5);
 
@@ -33,6 +38,21 @@ class GeocodingService {
       return cached.results;
     }
 
+    if (GooglePlacesService.available) {
+      try {
+        final google = await _google.search(
+          trimmed,
+          nearLat: nearLat,
+          nearLon: nearLon,
+          limit: limit,
+        );
+        if (google.isNotEmpty) {
+          _cache[key] = _CacheEntry(at: DateTime.now(), results: google);
+          return google;
+        }
+      } catch (_) {}
+    }
+
     final uri = ApiConfig.geocodeSearch(
       q: trimmed,
       limit: limit,
@@ -55,6 +75,12 @@ class GeocodingService {
   }
 
   Future<PlaceLocation> reverse(double lat, double lon) async {
+    if (GooglePlacesService.available) {
+      try {
+        return await _google.reverse(lat, lon);
+      } catch (_) {}
+    }
+
     final uri = ApiConfig.geocodeReverse(lat: lat, lon: lon);
     final res = await _client.get(uri).timeout(const Duration(seconds: 8));
     if (res.statusCode != 200) {
