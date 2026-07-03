@@ -46,7 +46,9 @@
     .spin { width: 36px; height: 36px; border: 3px solid #333; border-top-color: #39ff14; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
-  <script src="lan_discovery.js"></script>
+  <!-- /go is served from site root — static assets live under /app/ -->
+  <script src="/app/lan_discovery.js"></script>
+  <script src="/app/qr_poster.js"></script>
 </head>
 <body>
   <h1>GEENGREEN</h1>
@@ -55,27 +57,7 @@
   <a id="url" href="#" hidden></a>
   <p>GPS·위치는 <strong>스캔한 폰</strong>에서 사용됩니다.<br />길에서 지나가도 QR만 찍으면 바로 시작.</p>
   <script>
-    (async function () {
-      var meta = document.querySelector('meta[name="geengreen-public-url"]');
-      var publicUrl = meta ? meta.getAttribute('content') : '';
-      var url = await window.geengreenResolveMobileUrl({
-        publicUrl: publicUrl,
-        port: location.port || '8086',
-      });
-      var loading = document.getElementById('loading');
-      var img = document.getElementById('qr');
-      var link = document.getElementById('url');
-      if (!url) {
-        loading.outerHTML = '<p style="color:#ff453a;padding:12px">URL 준비 중… Wi‑Fi/LAN 확인</p>';
-        return;
-      }
-      loading.hidden = true;
-      img.hidden = false;
-      link.hidden = false;
-      link.textContent = url;
-      link.href = url;
-      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=440x440&data=' + encodeURIComponent(url);
-    })();
+    geengreenShowPosterQr({ size: 440 });
   </script>
 </body>
 </html>

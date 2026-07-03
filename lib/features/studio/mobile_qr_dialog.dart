@@ -249,8 +249,6 @@ class _QrCard extends StatelessWidget {
   }
 }
 
-/// Flutter web sometimes lays out [QrImageView] at 0×0 inside dialogs — use a
-/// sized network QR on web so the code is always visible.
 class _QrImage extends StatelessWidget {
   const _QrImage({required this.url, required this.size});
 
@@ -261,8 +259,7 @@ class _QrImage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (kIsWeb) {
       final px = size.round();
-      final qrUrl =
-          'https://api.qrserver.com/v1/create-qr-code/?size=${px}x$px&margin=8&data=${Uri.encodeComponent(url)}';
+      final qrUrl = '/qr.png?size=$px&data=${Uri.encodeComponent(url)}';
       return Image.network(
         qrUrl,
         width: size,
